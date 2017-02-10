@@ -5,9 +5,6 @@ import MySQLdb
 from config_Weather import WUkey, Wkey
 
 
-
-	
-
 #FUNCTION getWeather
 #call WU API, get the hourly conditions for a certain date and return a dictionary
 def getWeather(zc, date):
@@ -28,7 +25,7 @@ def getWeather(zc, date):
 	url ='http://api.wunderground.com/api/' + WUkey + thisCall + '.json'
 	myRequest = requests.get(url)
 	parsedRequest = myRequest.json()
-	
+
 	#dictionary of daily summary conditions
 	conditions = {'location' : 'Boston',		#name from zipcode later
 							#daily conditions
@@ -42,24 +39,22 @@ def getWeather(zc, date):
 							'minhum' :  str(parsedRequest['history']['dailysummary'][0]['minhumidity'])		,
 							'precip' :			str(parsedRequest['history']['dailysummary'][0]['precipm'])
 							}
-#	#for lazy debug
-#	for i in conditions:
-#		print(i + ': '+ conditions[i])
-	
+
 	#create hourly dictionary to be added to conditions
 	hourly = []
 	for j in range(24):
-		hourly.append({'time' : date[:4] + '-' + date[4:6] + '-' + date[6:8] + ' '
-								+ str(parsedRequest['history']['observations'][j]['date']['hour']) + ':' 
-								+ str(parsedRequest['history']['observations'][j]['date']['min']) +':00'	,
-								'temp' : str(parsedRequest['history']['observations'][j]['tempm'])			,
-								'hum' : str(parsedRequest['history']['observations'][j]['hum'])					,
-								'press' : str(parsedRequest['history']['observations'][j]['pressurem'])		,
-								'hprecip' : str(parsedRequest['history']['observations'][j]['precipm'])})
-							
+#		print(j)
+		try:
+			hourly.append({'time' : date[:4] + '-' + date[4:6] + '-' + date[6:8] + ' '
+										+ str(parsedRequest['history']['observations'][j]['date']['hour']) + ':' 
+										+ str(parsedRequest['history']['observations'][j]['date']['min']) +':00'	,
+										'temp' : str(parsedRequest['history']['observations'][j]['tempm'])			,
+										'hum' : str(parsedRequest['history']['observations'][j]['hum'])					,
+										'press' : str(parsedRequest['history']['observations'][j]['pressurem'])		,
+										'hprecip' : str(parsedRequest['history']['observations'][j]['precipm'])})
+		except:
+			print(hourly[j-1])
 	conditions['hourly'] = hourly
-#	print(hourly)
-#	print(conditions)
 	return conditions
 #END getWeather
 
@@ -78,13 +73,12 @@ def updateDB(date):
 	cursor.execute('INSERT INTO daily_summary (location, date) VALUES (\'' + loc + '\', \'' + str(updateConditions['date']) +'\');')
 	for key in updateConditions:
 		if (key != 'hourly' and  key !=  'location' and  key !=  'date'):
-			#load dailysummary
 			try:
 				cursor.execute('UPDATE  daily_summary SET '+ str(key) + ' = \'' + str(updateConditions[key]) 
 										+ '\' WHERE location = \'' + loc + '\' AND date = \'' + date + '\'')
 				myDB.commit()
 			except:
-				#the following syntax is wrong! It will stay for now to 
+				#the following syntax is wrong! It will stay for now 
 				print('FAILED for: ' + 'UPDATE  daily_summary SET '+ str(key) + ' = \'' + str(updateConditions[key]) 
 										+ '\' WHERE location = \'' + loc + '\' AND date = \'' + date + '\'')
 				myDB.commit()
@@ -92,20 +86,18 @@ def updateDB(date):
 
 	#load hourly
 	updateHourly = updateConditions['hourly']
-	#fix so that location can be used instead of zip?
-	for i in range(24):
+	for i in range(len(updateHourly)):
 		cursor.execute('INSERT INTO hourly (location, time) VALUES (\''+ loc + '\', \'' + str(updateHourly[i]['time']) +'\');')
 		for key2 in updateHourly[i]:
-			#load dailysummary
 			if key2 != 'time':
 				try:
 					cursor.execute('UPDATE hourly SET ' + str(key2) + ' = \'' + str(updateHourly[i][key2]) 
 											+ '\' WHERE location = \'' +loc + '\' AND time = \'' + str(updateHourly[i]['time']) +'\'')
 					myDB.commit()
 				except:
-					print('FAILED for: ' + '(' + str(key) +':' + str(updateHourly[i][key]) + ')')
+					print('FAILED for: ' + str(key) +':' + str(updateHourly[i][key]) )
 					myDB.rollback()
-	
+
 	myDB.close()
 #END updateDB
 
